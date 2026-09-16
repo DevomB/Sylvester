@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "1.1.0"
 description = "An exact linear algebra workbench for the terminal"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Devom Brahmbhatt" }]
 keywords = ["linear-algebra", "matrix", "rref", "determinant", "eigenvalues", "exact-arithmetic", "tui"]
 classifiers = [
@@ -16,7 +17,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Education",
     "Topic :: Scientific/Engineering :: Mathematics",
