@@ -26,6 +26,8 @@ def _magnitude(token):
     if token.startswith("sqrt(") and token.endswith(")"):
         return sqrt_exact(parse_value(token[5:-1]))
     if "/" in token:
+        if token.count("/") > 1:
+            raise ParseError("cannot read %r as a number" % token)
         num, _, den = token.partition("/")
         top, bottom = parse_value(num), parse_value(den)
         if isinstance(top, Surd) or isinstance(bottom, Surd):

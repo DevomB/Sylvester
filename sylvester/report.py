@@ -668,7 +668,7 @@ def eigen_report(matrix, show_steps=False):
         if not p.exact:
             out.append("  eigenvalue known numerically; eigenvectors below are numeric too")
             for v in p.basis:
-                out.append("  " + tuple_str(tuple("%.6f%+.6fi" % (x.real, x.imag) for x in v)))
+                out.append("  (" + ", ".join("%.6f%+.6fi" % (x.real, x.imag) for x in v) + ")")
             out.append("")
             continue
         out.append("  solve (A - %sI)x = 0:" % lam())
@@ -712,14 +712,27 @@ def eigen_report(matrix, show_steps=False):
         od = orthogonally_diagonalize(matrix)
         out.append("  A is symmetric, so its eigenvalues are real and its eigenvectors")
         out.append("  can be chosen orthogonal.")
+        for i, v in enumerate(od.orthogonal_basis):
+            out.append("  " + vec_line("q%d" % (i + 1), v))
         if od.ok:
-            for i, v in enumerate(od.orthogonal_basis):
-                out.append("  " + vec_line("q%d" % (i + 1), v))
             out.append("  %s the basis is pairwise orthogonal; normalize each column to get an orthogonal Q."
                        % check())
         else:
-            out.append("  " + od.reason)
+            out.extend("  " + line for line in _wrap(od.reason, 68))
     return "\n".join(out)
+
+
+def _wrap(text, width):
+    out, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            out.append(line)
+            line = word
+        else:
+            line = (line + " " + word).strip()
+    if line:
+        out.append(line)
+    return out
 
 
 def _tick(flag):

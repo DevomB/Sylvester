@@ -283,6 +283,16 @@ def orthogonally_diagonalize(matrix):
         for v in ortho.vectors:
             basis.append(v)
             diag.append(pair.value)
+    try:
+        unify_field([v for column in basis for v in column] + [p.value for p in spec.pairs])
+    except ArithmeticError:
+        return OrthogonalDiagonalization(
+            matrix, spec, blocks, basis, False,
+            "the eigenvalues span more than one quadratic field, so no single exact Q can be"
+            " written here; each eigenspace above is already orthogonal, and the spectral theorem"
+            " guarantees the eigenspaces are orthogonal to each other",
+            None, None,
+        )
     q = Matrix.from_columns(basis)
     d = Matrix.diagonal(diag)
     ok = is_orthogonal_set(basis) and matrix.matmul(q) == q.matmul(d)
