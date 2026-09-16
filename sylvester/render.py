@@ -96,6 +96,32 @@ def visible_len(text):
     return out
 
 
+def slice_visible(text, start, width):
+    if start <= 0 and width >= visible_len(text):
+        return text
+    out = []
+    seen = 0
+    taken = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] == "":
+            j = i
+            while j < n and text[j] != "m":
+                j += 1
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        if seen >= start:
+            if taken >= width:
+                break
+            out.append(text[i])
+            taken += 1
+        seen += 1
+        i += 1
+    return "".join(out)
+
+
 def pad(text, width, align="<"):
     gap = width - visible_len(text)
     if gap <= 0:
@@ -127,6 +153,12 @@ def _int_term(m, rad):
 def fmt(value):
     if isinstance(value, Surd):
         return _fmt_surd(value)
+    if isinstance(value, complex):
+        if abs(value.imag) < 1e-12:
+            return "%.6g" % value.real
+        return "%.6g%+.6gi" % (value.real, value.imag)
+    if isinstance(value, float):
+        return "%.6g" % value
     value = Fraction(value)
     if value.denominator == 1:
         return str(value.numerator)
