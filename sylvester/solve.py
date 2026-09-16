@@ -193,20 +193,3 @@ def cramer_report(matrix, constants):
     return CramerReport(matrix, constants, det, numerators, solution, True, "")
 
 
-def consistency(coefficients, constants):
-    sol = solve(coefficients, constants)
-    return sol.consistent, sol.rank, sol.rank_augmented
-
-
-def structure_check(solution):
-    if not solution.consistent:
-        return True
-    coefficients = solution.coefficients
-    target = Matrix.column(solution.constants)
-    if coefficients.matmul(Matrix.column(solution.particular)) != target:
-        return False
-    for vec in solution.homogeneous_basis:
-        combined = tuple(a + b for a, b in zip(solution.particular, vec))
-        if coefficients.matmul(Matrix.column(combined)) != target:
-            return False
-    return True

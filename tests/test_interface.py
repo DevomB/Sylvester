@@ -8,7 +8,7 @@ from sylvester import cli, report
 from sylvester.expr import evaluate
 from sylvester.matrix import Matrix
 from sylvester.parse import ParseError, parse_augmented, parse_matrix, parse_value, parse_vector
-from sylvester.render import fmt, matrix_str, slice_visible, visible_len
+from sylvester.render import slice_visible, visible_len
 from sylvester.samples import SAMPLES
 from sylvester.tui import keys as K
 from sylvester.tui.app import App

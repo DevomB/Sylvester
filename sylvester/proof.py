@@ -4,8 +4,8 @@ from fractions import Fraction
 
 from .determinant import adjugate, cofactor_matrix, determinant, det_triangular
 from .eigen import cayley_hamilton, characteristic_polynomial, spectrum
-from .exact import ONE, ZERO, Surd, approx
-from .inverse import Singular, inverse, inverse_gauss_jordan
+from .exact import ONE, approx
+from .inverse import inverse, inverse_gauss_jordan
 from .matrix import Matrix, elementary_add, elementary_scale, elementary_swap
 from .reduce import row_reduce
 from .solve import solve, solve_homogeneous
@@ -118,10 +118,6 @@ SYSTEMS = "Systems of linear equations"
 MATRICES = "Matrices and determinants"
 SPACES = "Vectors, subspaces and orthogonality"
 EIGEN = "Eigenvalues and eigenvectors"
-
-
-def _yes_no(flag):
-    return "holds" if flag else "fails"
 
 
 # ---------------------------------------------------------------- systems

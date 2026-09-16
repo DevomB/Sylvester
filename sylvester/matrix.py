@@ -324,11 +324,3 @@ def elementary_add(n, target, source, k):
     return Matrix(rows)
 
 
-def elementary_inverse(kind, n, *args):
-    if kind == "swap":
-        return elementary_swap(n, *args)
-    if kind == "scale":
-        i, k = args
-        return elementary_scale(n, i, ONE / scalar(k))
-    target, source, k = args
-    return elementary_add(n, target, source, -scalar(k))

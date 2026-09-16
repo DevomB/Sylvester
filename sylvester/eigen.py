@@ -4,7 +4,7 @@ from .determinant import characteristic_via_cofactor, determinant
 from .exact import ONE, ZERO, Surd, approx, unify_field
 from .matrix import Matrix
 from .polynomial import Poly, roots_of
-from .reduce import nullspace_basis, row_reduce
+from .reduce import nullspace_basis
 from .vectors import gram_schmidt, is_orthogonal_set
 
 
@@ -217,7 +217,6 @@ class Diagonalization:
 
 def diagonalize(matrix, spec=None):
     spec = spec or spectrum(matrix)
-    n = matrix.nrows
     if not spec.diagonalizable:
         return Diagonalization(matrix, None, None, False, spec.reason, spec, False)
     if not all(p.exact for p in spec.pairs):

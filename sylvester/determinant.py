@@ -195,11 +195,6 @@ def cramer(matrix, constants):
     return [num / d for _, num in numerators], d, numerators
 
 
-def vandermonde(values):
-    n = len(values)
-    return Matrix([[values[i] ** j for j in range(n)] for i in range(n)])
-
-
 def characteristic_via_cofactor(matrix):
     from .polynomial import Poly
 

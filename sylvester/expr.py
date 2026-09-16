@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 from .determinant import adjugate, determinant
-from .exact import ONE, ZERO, Surd, sqrt_exact
+from .exact import Surd, sqrt_exact
 from .inverse import inverse
 from .matrix import Matrix
 from .parse import ParseError, parse_value

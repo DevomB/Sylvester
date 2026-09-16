@@ -6,9 +6,9 @@ import sys
 from . import proof, report
 from .expr import evaluate
 from .parse import ParseError, parse_augmented, parse_matrix, parse_vector
-from .render import autodetect, fmt, matrix_str, set_ascii, set_color
+from .render import autodetect, matrix_str, set_ascii, set_color
 from .reduce import HUMAN, MACHINE
-from .samples import CLO, SAMPLES, by_clo, get
+from .samples import CLO, by_clo, get
 from . import vectors as V
 
 PROGRAM = "sylvester"
@@ -250,8 +250,6 @@ def run_samples(args):
 
 
 def sample_text(sample):
-    from .matrix import Matrix
-
     out = ["CLO %d  %s" % (sample.clo, CLO[sample.clo]), "", sample.title, sample.note, ""]
     a = sample.registers.get("A")
     b = sample.registers.get("B")

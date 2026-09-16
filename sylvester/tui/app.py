@@ -6,8 +6,8 @@ from .. import proof, report
 from ..expr import FUNCTION_HELP, evaluate
 from ..matrix import Matrix
 from ..parse import ParseError
-from ..render import C, autodetect, dim, fmt, glyph, matrix_str, pad, paint, set_color, table
-from ..samples import CLO, SAMPLES, by_clo
+from ..render import C, autodetect, dim, fmt, matrix_str, paint, set_color
+from ..samples import CLO, by_clo
 from ..reduce import HUMAN, MACHINE
 from .. import vectors as V
 from . import keys as K

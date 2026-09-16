@@ -228,14 +228,6 @@ def is_real(value):
     return not isinstance(value, Surd) or value.is_real
 
 
-def is_rational(value):
-    return isinstance(value, (int, Fraction))
-
-
-def radicand_of(value):
-    return value.d if isinstance(value, Surd) else 1
-
-
 def unify_field(values):
     field = 1
     for v in values:

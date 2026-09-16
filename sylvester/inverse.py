@@ -3,7 +3,7 @@ from __future__ import annotations
 from .determinant import adjugate, determinant
 from .exact import ONE, ZERO
 from .matrix import Matrix
-from .reduce import MACHINE, describe_op, op_to_elementary, row_reduce
+from .reduce import MACHINE, op_to_elementary, row_reduce
 
 
 class Singular(ValueError):
@@ -86,7 +86,7 @@ def elementary_factorization(matrix):
 
 
 def invert_elementary(op, n):
-    from .matrix import elementary_add, elementary_scale, elementary_swap
+    from .matrix import elementary_scale, elementary_swap
 
     if op[0] == "swap":
         return elementary_swap(n, op[1], op[2])
@@ -97,10 +97,6 @@ def invert_elementary(op, n):
     e[t][t] = ONE / tm
     e[t][s] = -sm / tm
     return Matrix(e)
-
-
-def describe_factorization(factorization):
-    return [describe_op(op) for op in factorization.ops]
 
 
 class LU:

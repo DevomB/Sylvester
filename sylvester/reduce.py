@@ -398,7 +398,7 @@ def apply_op(matrix, op):
 
 
 def op_to_elementary(op, n):
-    from .matrix import elementary_add, elementary_scale, elementary_swap
+    from .matrix import elementary_scale, elementary_swap
 
     if op[0] == "swap":
         return elementary_swap(n, op[1], op[2])

@@ -3,7 +3,7 @@ from __future__ import annotations
 from .exact import ONE, ZERO
 from .matrix import Matrix
 from .reduce import nullspace_basis, row_reduce
-from .vectors import as_vector, is_zero
+from .vectors import as_vector
 
 
 class Independence:

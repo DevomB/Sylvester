@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from fractions import Fraction
-
 from .determinant import (cofactor_matrix, det_by_row_reduction, determinant,
                           expand_cofactors)
 from .eigen import diagonalize, orthogonally_diagonalize, spectrum
@@ -637,7 +635,6 @@ def projection_report(target, basis):
 
 def eigen_report(matrix, show_steps=False):
     spec = spectrum(matrix)
-    n = matrix.nrows
     out = [heading("eigenvalues, eigenvectors and eigenspaces", WIDTH), "", block("A", matrix), ""]
     out.append(subheading("Characteristic polynomial"))
     out.append("  det(%sI - A) = %s" % (lam(), spec.poly.shift_variable(lam())))

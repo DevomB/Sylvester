@@ -45,10 +45,6 @@ def set_color(flag):
     _COLOR = flag
 
 
-def ascii_mode():
-    return _ASCII
-
-
 def glyph(unicode_char, fallback):
     return fallback if _ASCII else unicode_char
 
@@ -73,10 +69,6 @@ def paint(text, *codes):
     if not _COLOR or not codes:
         return text
     return "".join(codes) + text + C.RESET
-
-
-def bold(text):
-    return paint(text, C.BOLD)
 
 
 def dim(text):
@@ -193,22 +185,6 @@ def fmt_coeff(value):
     return "(%s)" % text if " " in text else text
 
 
-def fmt_approx(value, places=6):
-    from .exact import approx
-
-    v = approx(value)
-    if isinstance(v, complex):
-        if abs(v.imag) < 1e-12:
-            return "%.*f" % (places, v.real)
-        sign = "-" if v.imag < 0 else "+"
-        return "%.*f %s %.*fi" % (places, v.real, sign, places, abs(v.imag))
-    return "%.*f" % (places, v)
-
-
-def needs_approx(value):
-    return isinstance(value, Surd)
-
-
 def matrix_lines(matrix, split_at=None, highlight=None, width_hint=None):
     rows = matrix.rows if hasattr(matrix, "rows") else matrix
     if not rows:
@@ -268,12 +244,6 @@ def side_by_side(blocks, gap=4, labels=None):
     return "\n".join(out)
 
 
-def vector_str(values, style="col"):
-    if style == "row":
-        return "(" + ", ".join(fmt(v) for v in values) + ")"
-    return matrix_str([[v] for v in values])
-
-
 def tuple_str(values):
     return "(" + ", ".join(fmt(v) for v in values) + ")"
 
@@ -313,30 +283,8 @@ def table(rows, headers=None, indent="  "):
     return "\n".join(out)
 
 
-def box(lines, title=None, width=None):
-    content = lines.splitlines() if isinstance(lines, str) else list(lines)
-    inner = max([visible_len(l) for l in content] + [len(title) + 4 if title else 0])
-    inner = max(inner, (width or 0) - 4)
-    h = glyph("─", "-")
-    v = glyph("│", "|")
-    tl, tr, bl, br = (glyph(c, f) for c, f in (("┌", "+"), ("┐", "+"), ("└", "+"), ("┘", "+")))
-    if title:
-        top = tl + h + paint(" %s " % title, C.BOLD) + h * (inner - len(title) - 1) + tr
-    else:
-        top = tl + h * (inner + 2) + tr
-    out = [top]
-    for line in content:
-        out.append(v + " " + pad(line, inner) + " " + v)
-    out.append(bl + h * (inner + 2) + br)
-    return "\n".join(out)
-
-
 def lam():
     return glyph("λ", "L")
-
-
-def times():
-    return glyph("×", "x")
 
 
 def arrow():
@@ -351,34 +299,6 @@ def dot():
     return glyph("·", ".")
 
 
-def in_sign():
-    return glyph("∈", "in")
-
-
-def subset_sign():
-    return glyph("⊆", "subset")
-
-
-def perp():
-    return glyph("⊥", "perp")
-
-
-def neq():
-    return glyph("≠", "!=")
-
-
-def leq():
-    return glyph("≤", "<=")
-
-
-def geq():
-    return glyph("≥", ">=")
-
-
-def infinity():
-    return glyph("∞", "inf")
-
-
 def check():
     return glyph("✓", "OK")
 
@@ -387,5 +307,3 @@ def cross():
     return glyph("✗", "X")
 
 
-def sqrt_sign():
-    return glyph("√", "sqrt")

@@ -79,10 +79,6 @@ def parse_vector(text):
     return tuple(parse_row(cleaned))
 
 
-def parse_vectors(text):
-    return [tuple(parse_row(chunk)) for chunk in split_rows(text)]
-
-
 def parse_augmented(text):
     if "|" in text:
         rows = []

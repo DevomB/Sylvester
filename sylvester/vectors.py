@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import math
-from fractions import Fraction
 
-from .exact import ONE, ZERO, Surd, approx, content, is_exact_square, sqrt_exact
+from .exact import ONE, ZERO, Surd, approx, content, sqrt_exact
 from .matrix import Matrix
 
 
@@ -53,18 +52,6 @@ def dot(u, v):
     return total
 
 
-def weighted_dot(u, v, weights):
-    _check(u, v)
-    total = ZERO
-    for a, b, w in zip(u, v, weights):
-        total += w * a * b
-    return total
-
-
-def gram_matrix(vectors):
-    return Matrix([[dot(u, v) for v in vectors] for u in vectors])
-
-
 def norm_squared(v):
     return dot(v, v)
 
@@ -73,20 +60,8 @@ def norm(v):
     return sqrt_exact(norm_squared(v))
 
 
-def norm_is_exact(v):
-    return is_exact_square(norm_squared(v))
-
-
 def distance(u, v):
     return norm(subtract(u, v))
-
-
-def distance_squared(u, v):
-    return norm_squared(subtract(u, v))
-
-
-def is_unit(v):
-    return norm_squared(v) == 1
 
 
 def normalize(v):
@@ -106,10 +81,6 @@ def is_orthogonal_set(vectors):
         for i in range(len(vectors))
         for j in range(i + 1, len(vectors))
     )
-
-
-def is_orthonormal_set(vectors):
-    return is_orthogonal_set(vectors) and all(norm_squared(v) == 1 for v in vectors)
 
 
 def cos_angle_squared(u, v):
@@ -140,10 +111,6 @@ def cross(u, v):
     )
 
 
-def triple_product(u, v, w):
-    return dot(u, cross(v, w))
-
-
 class Projection:
     __slots__ = ("vector", "onto", "coefficient", "parallel", "perpendicular", "is_subspace")
 
@@ -171,10 +138,6 @@ def project_onto_vector(v, onto):
     k = dot(v, onto) / denom
     parallel = scale(k, onto)
     return Projection(tuple(v), tuple(onto), k, parallel, subtract(v, parallel))
-
-
-def component_along(v, onto):
-    return project_onto_vector(v, onto).coefficient
 
 
 def project_onto_subspace(v, basis):
