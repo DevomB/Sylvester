@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from .determinant import (cofactor_matrix, det_by_row_reduction, determinant,
                           expand_cofactors)
-from .eigen import diagonalize, orthogonally_diagonalize, spectrum
+from .eigen import diagonalize, evaluate_at, orthogonally_diagonalize, spectrum
 from .exact import ONE, Surd
 from .inverse import (elementary_factorization, inverse_adjugate, inverse_gauss_jordan,
                       lu_decomposition)
 from .matrix import Matrix
 from .reduce import HUMAN, MACHINE, row_reduce
 from .render import (C, bullet, check, cross, dim, fmt, fmt_coeff, heading, lam, matrix_str,
-                     paint, rule, side_by_side, subheading, table, tuple_str)
+                     paint, rule, side_by_side, sqrt_text, subheading, table, tuple_str)
 from .solve import INCONSISTENT, UNIQUE, cramer_report, homogeneous_report, solve
 from .subspace import basis_from_spanning_set, four_subspaces, in_span, independence
 from . import vectors as V
+from .vectors import dot
 
 WIDTH = 72
 
@@ -635,88 +636,216 @@ def projection_report(target, basis):
 
 def eigen_report(matrix, show_steps=False):
     spec = spectrum(matrix)
+    name = lam()
     out = [heading("eigenvalues, eigenvectors and eigenspaces", WIDTH), "", block("A", matrix), ""]
     out.append(subheading("Characteristic polynomial"))
-    out.append("  det(%sI - A) = %s" % (lam(), spec.poly.shift_variable(lam())))
+    out.append("  det(%sI - A) = %s" % (name, spec.poly.shift_variable(name)))
+    out.append("  factored over Q: %s" % factored_text(spec.factors))
     out.append("")
-    if not spec.exact:
-        out.append(paint(
-            "Some roots are irrational of degree above 2; those are reported numerically.", C.YELLOW))
-        out.append("")
     out.append(subheading("Eigenvalues"))
     rows = []
     for p in spec.pairs:
+        each = " each" if p.symbolic else ""
         rows.append([
-            "%s = %s" % (lam(), sval(p.value)),
-            "algebraic %d" % p.algebraic,
-            "geometric %d" % p.geometric,
+            eigenvalue_cell(p),
+            "algebraic %d%s" % (p.algebraic, each),
+            "geometric %d%s" % (p.geometric, each),
             "defective" if p.defective else "",
-            "" if p.is_real else "complex",
+            realness(p),
         ])
     out.append(table(rows))
+    for p in spec.pairs:
+        if p.symbolic:
+            out.append("")
+            out.append("  the roots of %s:" % p.minimal.shift_variable(name))
+            out.append("    " + "   ".join(
+                "%s%d ~ %s" % (name, i + 1, approx_text(r)) for i, r in enumerate(p.roots)))
+            out.extend(dim("    " + line) for line in _wrap(
+                "No closed form is needed to be exact: each root is handled as an exact algebraic "
+                "number, computing in Q(%s) = Q[%s]/(%s), so every identity below holds for all %d "
+                "roots at once." % (name, name, p.minimal.shift_variable(name), p.count), 70))
     out.append("")
     out.append(table([
-        ["sum of eigenvalues = tr(A) = %s" % fmt(matrix.trace()), _tick(spec.trace_check)],
-        ["product of eigenvalues = det(A) = %s" % fmt(determinant(matrix)), _tick(spec.det_check)],
+        ["sum of eigenvalues = tr(A) = %s" % fmt(matrix.trace()),
+         check() if spec.trace_check else cross()],
+        ["product of eigenvalues = det(A) = %s" % fmt(determinant(matrix)),
+         check() if spec.det_check else cross()],
     ]))
     out.append("")
     for p in spec.pairs:
-        out.append(subheading("Eigenspace for %s = %s" % (lam(), sval(p.value))))
-        if not p.exact:
-            out.append("  eigenvalue known numerically; eigenvectors below are numeric too")
-            for v in p.basis:
-                out.append("  (" + ", ".join("%.6f%+.6fi" % (x.real, x.imag) for x in v) + ")")
-            out.append("")
-            continue
-        out.append("  solve (A - %sI)x = 0:" % lam())
-        out.append(matrix_str(p.shifted, None, "   "))
-        red = row_reduce(p.shifted)
-        if show_steps:
-            out.append("")
-            out.append(steps_block(red))
+        out.extend(eigenspace_lines(matrix, p, show_steps))
         out.append("")
-        out.append("  RREF:")
-        out.append(matrix_str(red.rref, None, "   "))
+    out.extend(diagonalization_lines(matrix, spec))
+    if matrix.is_symmetric():
         out.append("")
-        if not p.basis:
-            out.append("  no nonzero solutions found")
-        for i, v in enumerate(p.basis):
-            out.append("  " + vec_line("basis vector v%d" % (i + 1), v))
-        out.append("  dim E(%s) = %d, algebraic multiplicity %d%s"
-                   % (lam(), p.geometric, p.algebraic,
-                      ", so this eigenvalue is defective" if p.defective else ""))
-        if p.basis:
-            v = p.basis[0]
-            out.append("  %s check: Av = %s and %sv = %s"
-                       % (check(), tuple_str(matrix.matmul(Matrix.column(v)).column_at(0)),
-                          lam(), tuple_str(tuple(p.value * x for x in v))))
+        out.extend(spectral_lines(matrix))
+    return "\n".join(out)
+
+
+def factored_text(factors):
+    name = lam()
+    if len(factors) == 1 and factors[0][1] == 1:
+        q = factors[0][0]
+        return q.shift_variable(name) + ("   (irreducible)" if q.degree > 1 else "")
+    parts = []
+    for q, m in factors:
+        parts.append("(%s)%s" % (q.shift_variable(name), "^%d" % m if m > 1 else ""))
+    return "".join(parts)
+
+
+def eigenvalue_cell(pair):
+    if pair.symbolic:
+        return "%s = each root of %s" % (lam(), pair.minimal.shift_variable(lam()))
+    return "%s = %s" % (lam(), sval(pair.value))
+
+
+def realness(pair):
+    if pair.symbolic:
+        if pair.real_count == pair.count:
+            return "all %d real" % pair.count
+        if not pair.real_count:
+            return "all %d complex" % pair.count
+        return "%d real, %d complex" % (pair.real_count, pair.count - pair.real_count)
+    return "" if pair.is_real else "complex"
+
+
+def approx_text(value):
+    if isinstance(value, complex):
+        if abs(value.imag) < 1e-12:
+            return "%.6f" % value.real
+        return "%.6f %s %.6fi" % (value.real, "-" if value.imag < 0 else "+", abs(value.imag))
+    return "%.6f" % value
+
+
+def eigenspace_lines(matrix, p, show_steps):
+    name = lam()
+    out = []
+    if p.symbolic:
+        out.append(subheading("Eigenspace for each root %s of %s" % (name, p.minimal.shift_variable(name))))
+        out.append("  solve (A - %sI)x = 0 over Q(%s):" % (name, name))
+    else:
+        out.append(subheading("Eigenspace for %s = %s" % (name, sval(p.value))))
+        out.append("  solve (A - %sI)x = 0:" % name)
+    out.append(matrix_str(p.shifted, None, "   "))
+    if show_steps:
         out.append("")
-    out.append(subheading("Diagonalization"))
+        out.append(steps_block(p.reduction))
+    out.append("")
+    out.append("  RREF:")
+    out.append(matrix_str(p.reduction.rref, None, "   "))
+    out.append("")
+    for i, v in enumerate(p.basis):
+        out.append("  " + vec_line("basis vector v%d" % (i + 1), v))
+    out.append("  dim E(%s) = %d%s, algebraic multiplicity %d%s" % (
+        name, p.geometric, " for each root" if p.symbolic else "", p.algebraic,
+        ", so this eigenvalue is defective" if p.defective else ""))
+    if not p.basis:
+        return out
+    v = p.basis[0]
+    left = matrix.matmul(Matrix.column(v)).column_at(0)
+    right = tuple(p.value * x for x in v)
+    if not p.symbolic:
+        out.append("  %s check: Av = %s and %sv = %s" % (check(), tuple_str(left), name, tuple_str(right)))
+        return out
+    out.append("  %s check: Av = %s" % (check(), tuple_str(left)))
+    out.append("           %sv = %s" % (name, tuple_str(right)))
+    out.append("    equal once %s is reduced using %s = 0, so Av = %sv for every root" % (
+        name + "^%d" % p.minimal.degree, p.minimal.shift_variable(name), name))
+    out.append("  numerically, at each root:")
+    for i, root in enumerate(p.roots):
+        out.append("    v1(%s%d) ~ (%s)" % (
+            name, i + 1, ", ".join(approx_text(evaluate_at(x, root)) for x in v)))
+    return out
+
+
+def diagonalization_lines(matrix, spec):
+    name = lam()
+    out = [subheading("Diagonalization")]
     d = diagonalize(matrix, spec)
     if not d.ok:
         out.append(paint("A is not diagonalizable.", C.RED, C.BOLD))
         out.append("  " + d.reason)
-    else:
-        out.append(paint("A is diagonalizable.", C.GREEN, C.BOLD))
-        out.append("  " + spec.reason)
-        out.append("")
+        return out
+    out.append(paint("A is diagonalizable%s." % ("" if spec.real_only else " over the complex numbers"),
+                     C.GREEN, C.BOLD))
+    out.append("  " + d.reason)
+    out.append("")
+    if d.p is not None:
         out.append(side_by_side([matrix_str(d.p), matrix_str(d.d)], gap=4, labels=["P", "D"]))
         out.append("")
         out.append("  %s checked: AP = PD, so P^-1 A P = D." % (check() if d.verified else cross()))
-    if matrix.is_symmetric():
-        out.append("")
-        out.append(subheading("Spectral theorem"))
-        od = orthogonally_diagonalize(matrix)
-        out.append("  A is symmetric, so its eigenvalues are real and its eigenvectors")
-        out.append("  can be chosen orthogonal.")
-        for i, v in enumerate(od.orthogonal_basis):
-            out.append("  " + vec_line("q%d" % (i + 1), v))
-        if od.ok:
-            out.append("  %s the basis is pairwise orthogonal; normalize each column to get an orthogonal Q."
-                       % check())
+        return out
+    labels = []
+    diagonal = []
+    definitions = []
+    for index, (pair, v) in enumerate(d.columns):
+        if pair.symbolic:
+            family = "w%d" % (index + 1)
+            definitions.append("%s(%s) = %s for %s a root of %s" % (
+                family, name, tuple_str(v), name, pair.minimal.shift_variable(name)))
+            for i in range(pair.count):
+                labels.append("%s(%s%d)" % (family, name, i + 1))
+                diagonal.append("%s%d" % (name, i + 1))
         else:
-            out.extend("  " + line for line in _wrap(od.reason, 68))
-    return "\n".join(out)
+            labels.append(tuple_str(v))
+            diagonal.append(fmt(pair.value))
+    out.append("  P = [ %s ]" % "   ".join(labels))
+    out.append("  D = diag(%s)" % ", ".join(diagonal))
+    for line in definitions:
+        out.append("  where " + line)
+    out.append("")
+    out.append("  %s checked: every column p satisfies Ap = %sp exactly, so AP = PD and P^-1 A P = D."
+               % (check() if d.verified else cross(), name))
+    return out
+
+
+def spectral_lines(matrix):
+    name = lam()
+    od = orthogonally_diagonalize(matrix)
+    spec = od.spectrum
+    out = [subheading("Spectral theorem")]
+    out.append("  A is symmetric, so every eigenvalue is real and the eigenvectors can be chosen orthogonal.")
+    if spec is None:
+        out.append("  " + od.reason)
+        return out
+    for p in spec.pairs:
+        mark = check() if p.is_real else cross()
+        if p.symbolic:
+            out.append("  %s all %d roots of %s are real: Sturm's theorem counts %d real roots" % (
+                mark, p.count, p.minimal.shift_variable(name), p.real_count))
+        elif p.minimal.degree == 2:
+            out.append("  %s %s = %s is real: %s has positive discriminant" % (
+                mark, name, fmt(p.value), p.minimal.shift_variable(name)))
+        else:
+            out.append("  %s %s = %s is rational" % (mark, name, fmt(p.value)))
+    out.append("")
+    if not od.columns:
+        out.append("  " + od.reason)
+        return out
+    out.append("  orthogonal eigenvectors, from Gram-Schmidt inside each eigenspace:")
+    for i, (pair, v) in enumerate(od.columns):
+        suffix = "   for each root of %s" % pair.minimal.shift_variable(name) if pair.symbolic else ""
+        out.append("    " + vec_line("q%d" % (i + 1), v) + suffix)
+    out.append("")
+    counts = {}
+    for c in od.checks:
+        counts[c.method] = counts.get(c.method, 0) + 1
+    explanations = {
+        "same eigenvalue": "a direct inner product inside one field",
+        "different minimal polynomials": "every coefficient of the inner product in Q[x, y]/(p(x), q(y)) is zero",
+        "conjugate eigenvalues": "the inner product is zero modulo q(x) and (q(y) - q(x))/(y - x)",
+    }
+    out.append("  orthogonality between every pair of columns, checked exactly (%d check%s):" % (
+        len(od.checks), "" if len(od.checks) == 1 else "s"))
+    for method in sorted(counts):
+        out.append("    %d by %s: %s" % (counts[method], method, explanations[method]))
+    out.append("")
+    out.append("  normalizing each column:")
+    for i, (pair, v) in enumerate(od.columns):
+        out.append("    ||q%d|| = %s" % (i + 1, sqrt_text(dot(v, v))))
+    out.append("")
+    out.append("  %s %s" % (check() if od.ok else cross(), od.reason))
+    return out
 
 
 def _wrap(text, width):
@@ -730,12 +859,6 @@ def _wrap(text, width):
     if line:
         out.append(line)
     return out
-
-
-def _tick(flag):
-    if flag is None:
-        return dim("not comparable in a single field")
-    return check() if flag else cross()
 
 
 def properties_report(matrix):

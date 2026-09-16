@@ -208,6 +208,24 @@ SAMPLES = [
         "Algebraic multiplicity 2 matched by geometric multiplicity 2, so it still diagonalizes.",
         {"A": _m([[5, -1, -1], [-1, 5, -1], [-1, -1, 5]])},
     ),
+    Sample(
+        "eigen-cubic", "An irreducible cubic, solved exactly", 8, "eigen",
+        "The characteristic polynomial does not factor over Q and has no convenient radical form, "
+        "yet the eigenvector comes out exactly as a polynomial in the eigenvalue: (L^2 - 1, L, 1).",
+        {"A": _m([[1, 1, 0], [1, 0, 1], [0, 1, 0]])},
+    ),
+    Sample(
+        "eigen-cube-root", "Cube roots of 2: one real eigenvalue, two complex", 8, "eigen",
+        "L^3 = 2 has one real root and a complex conjugate pair; a single exact eigenvector "
+        "(L^2, L, 1) covers all three.",
+        {"A": _m([[0, 0, 2], [1, 0, 0], [0, 1, 0]])},
+    ),
+    Sample(
+        "eigen-two-fields", "Eigenvalues in two different quadratic fields", 8, "eigen",
+        "The eigenvalues are 4sqrt2, -4sqrt2 and 2 + 2sqrt5, 2 - 2sqrt5, so no single square root "
+        "covers them; orthogonality across the two fields is still checked exactly.",
+        {"A": _m([[5, 1, 3, -1], [1, 5, -1, 3], [3, -1, -3, 1], [-1, 3, 1, -3]])},
+    ),
 ]
 
 BY_KEY = {s.key: s for s in SAMPLES}

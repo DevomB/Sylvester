@@ -4,7 +4,7 @@ from fractions import Fraction
 
 from .determinant import adjugate, cofactor_matrix, determinant, det_triangular
 from .eigen import cayley_hamilton, characteristic_polynomial, spectrum
-from .exact import ONE, approx
+from .exact import ONE, Surd, approx
 from .inverse import inverse, inverse_gauss_jordan
 from .matrix import Matrix, elementary_add, elementary_scale, elementary_swap
 from .reduce import row_reduce
@@ -976,24 +976,21 @@ def _basis_dimension(prop, a):
 )
 def _eigen_definition(prop, a):
     spec = spectrum(a)
-    lines = [mat("A", a), text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L"))]
-    holds = True
+    lines = [mat("A", a), text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L")),
+             text("factored over Q", _factored(spec))]
     for pair in spec.pairs:
         lines.append(text("---"))
-        lines.append(text("lambda", _s(pair.value)))
+        lines.append(text("eigenvalue", _eigenvalue(pair)))
         lines.append(text("algebraic / geometric multiplicity", "%d / %d" % (pair.algebraic, pair.geometric)))
         for v in pair.basis:
             lines.append(vec("eigenvector v", v))
-            if pair.exact:
-                left = a.matmul(Matrix.column(v)).column_at(0)
-                right = tuple(pair.value * x for x in v)
-                lines.append(vec("Av", left))
-                lines.append(vec("lambda v", right))
-                holds = holds and left == right
+            lines.append(vec("Av", a.matmul(Matrix.column(v)).column_at(0)))
+            lines.append(vec("lambda v", tuple(pair.value * x for x in v)))
     return prop.certificate(
-        holds, lines,
-        "every listed eigenvector satisfies Av = lambda v exactly" if spec.exact
-        else "some eigenvalues are irrational of degree > 2 and are reported numerically",
+        spec.verify(), lines,
+        "every listed eigenvector satisfies Av = lambda v exactly"
+        + ("; for a root family the identity is exact modulo its minimal polynomial, so it holds for"
+           " every root" if spec.symbolic else ""),
     )
 
 
@@ -1008,18 +1005,22 @@ def _eigen_definition(prop, a):
 )
 def _eigen_trace_det(prop, a):
     spec = spectrum(a)
-    lines = [mat("A", a), text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L"))]
-    for pair in spec.pairs:
-        lines.append(text("lambda (multiplicity %d)" % pair.algebraic, _s(pair.value)))
+    lines = [mat("A", a), text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L")),
+             text("factored over Q", _factored(spec))]
+    for q, m in spec.factors:
+        k = q.degree
+        lines.append(text(
+            "roots of %s" % q.shift_variable("L"),
+            "%d root%s summing to %s and multiplying to %s, each counted %d time%s" % (
+                k, "" if k == 1 else "s", _s(-q[k - 1]), _s((-1) ** k * q[0]), m, "" if m == 1 else "s")))
     lines += [
         num("tr(A)", a.trace()),
         num("det(A)", determinant(a)),
-        text("sum of eigenvalues matches tr(A)", _flag(spec.trace_check)),
-        text("product of eigenvalues matches det(A)", _flag(spec.det_check)),
+        text("sum of eigenvalues matches tr(A)", "yes" if spec.trace_check else "no"),
+        text("product of eigenvalues matches det(A)", "yes" if spec.det_check else "no"),
     ]
-    holds = spec.trace_check is not False and spec.det_check is not False
     return prop.certificate(
-        holds, lines,
+        spec.trace_check and spec.det_check, lines,
         "the second coefficient of p is -tr(A) and the constant term is (-1)^n det(A)",
     )
 
@@ -1035,25 +1036,33 @@ def _eigen_trace_det(prop, a):
 )
 def _distinct_eigenvalues_independent(prop, a):
     spec = spectrum(a)
-    picked = [(p, p.basis[0]) for p in spec.pairs if p.exact and p.basis]
+    picked = [(p, p.basis[0]) for p in spec.pairs if p.basis]
+    distinct = sum(p.count for p, _ in picked)
     lines = [mat("A", a)]
     for p, v in picked:
-        lines.append(vec("eigenvector for lambda = %s" % _s(p.value), v))
-    if len(picked) < 2:
-        return prop.certificate(
-            True, lines, "fewer than two distinct exact eigenvalues, so there is nothing to check"
-        )
-    try:
+        lines.append(vec("eigenvector for %s" % _eigenvalue(p), v))
+    if distinct < 2:
+        return prop.certificate(True, lines, "there is only one distinct eigenvalue, so nothing to check")
+    hypotheses = all(p.verify(a) for p, _ in picked)
+    lines.append(text("each Av = lambda v", "verified exactly" if hypotheses else "FAILED"))
+    shared = not spec.symbolic and len({p.value.d for p, _ in picked if isinstance(p.value, Surd)}) <= 1
+    if shared:
         ind = independence([v for _, v in picked])
-    except ArithmeticError:
+        lines.append(num("rank of the eigenvector set", ind.rank))
         return prop.certificate(
-            True, lines,
-            "the eigenvectors live in different quadratic fields, so they cannot share one matrix here",
+            hypotheses and ind.independent, lines,
+            "the %d eigenvectors for distinct eigenvalues are independent" % distinct,
         )
-    lines.append(num("rank of the eigenvector set", ind.rank))
+    lines += [
+        text("distinct eigenvalues", "different minimal polynomials share no roots, and an irreducible "
+                                     "polynomial has no repeated root, so all %d are distinct" % distinct),
+        text("argument", "if c_1 v_1 + ... + c_k v_k = 0, applying the product of (A - lambda_j I) over "
+                         "j != i leaves c_i times the product of (lambda_i - lambda_j) times v_i = 0; every "
+                         "factor is nonzero and v_i != 0, so c_i = 0 for every i"),
+    ]
     return prop.certificate(
-        ind.independent, lines,
-        "the %d eigenvectors for distinct eigenvalues are independent" % len(picked),
+        hypotheses, lines,
+        "the %d eigenvectors for distinct eigenvalues are independent" % distinct,
     )
 
 
@@ -1074,17 +1083,20 @@ def _symmetric_real(prop, a):
             True, [mat("A", a), text("symmetric", "no")],
             "A is not symmetric, so the spectral theorem does not apply",
         )
-    spec = spectrum(a)
     od = orthogonally_diagonalize(a)
+    spec = od.spectrum
     lines = [mat("A", a), text("symmetric", "yes"),
-             text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L"))]
+             text("characteristic polynomial", "p(L) = %s" % spec.poly.shift_variable("L")),
+             text("factored over Q", _factored(spec))]
     for pair in spec.pairs:
-        lines.append(text("lambda", "%s  (real: %s)" % (_s(pair.value), "yes" if pair.is_real else "no")))
-    for i, v in enumerate(od.orthogonal_basis):
+        lines.append(text("eigenvalue", "%s  (real roots: %d of %d)" % (
+            _eigenvalue(pair), pair.real_count, pair.count)))
+    for i, (pair, v) in enumerate(od.columns):
         lines.append(vec("orthogonal eigenvector q%d" % (i + 1), v))
-    lines.append(text("pairwise orthogonal", "yes" if od.ok else "no"))
+    lines.append(text("pairwise orthogonality checks", "%d, all exact and all zero" % len(od.checks)
+                      if od.ok else "failed"))
     return prop.certificate(
-        spec.real_only and (od.ok or not spec.exact), lines,
+        spec.real_only and od.ok, lines,
         "all eigenvalues are real and the eigenvectors can be chosen orthogonal",
     )
 
@@ -1141,7 +1153,13 @@ def _s(value):
     return fmt(value)
 
 
-def _flag(value):
-    if value is None:
-        return "not comparable in one field"
-    return "yes" if value else "no"
+def _eigenvalue(pair):
+    if pair.symbolic:
+        return "each root of %s" % pair.minimal.shift_variable("L")
+    return "lambda = %s" % _s(pair.value)
+
+
+def _factored(spec):
+    return " ".join(
+        "(%s)%s" % (q.shift_variable("L"), "^%d" % m if m > 1 else "") for q, m in spec.factors
+    )

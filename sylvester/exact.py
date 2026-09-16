@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
+from .algebraic import AlgebraicNumber
+
 Q = Fraction
 ZERO = Fraction(0)
 ONE = Fraction(1)
@@ -224,18 +226,16 @@ def is_exact_square(value):
     return num * num == value.numerator and den * den == value.denominator
 
 
-def is_real(value):
-    return not isinstance(value, Surd) or value.is_real
+def is_rational(value):
+    return isinstance(value, (int, Fraction))
 
 
-def unify_field(values):
-    field = 1
-    for v in values:
-        if isinstance(v, Surd):
-            if field != 1 and field != v.d:
-                raise ArithmeticError("values span more than one quadratic field")
-            field = v.d
-    return field
+def denominators(value):
+    if isinstance(value, Surd):
+        return value.a.denominator, value.b.denominator
+    if isinstance(value, AlgebraicNumber):
+        return tuple(c.denominator for c in value.c)
+    return (Fraction(value).denominator,)
 
 
 def approx(value):
@@ -249,25 +249,17 @@ def approx(value):
 def weight(value):
     if isinstance(value, Surd):
         return max(weight(value.a), weight(value.b)) * (1 + abs(value.d))
+    if isinstance(value, AlgebraicNumber):
+        return max(weight(c) for c in value.c if c) * (1 + value.field.degree)
     value = Fraction(value)
     return max(abs(value.numerator), value.denominator)
-
-
-def common_denominator(values):
-    den = 1
-    for v in values:
-        if isinstance(v, Surd):
-            den = den * v.a.denominator // math.gcd(den, v.a.denominator)
-            den = den * v.b.denominator // math.gcd(den, v.b.denominator)
-        else:
-            f = Fraction(v)
-            den = den * f.denominator // math.gcd(den, f.denominator)
-    return den
 
 
 def content(values):
     g = 0
     for v in values:
+        if isinstance(v, AlgebraicNumber):
+            return 1
         if isinstance(v, Surd):
             if v.a.denominator != 1 or v.b.denominator != 1:
                 return 1

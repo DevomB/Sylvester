@@ -31,7 +31,7 @@ $ python -m sylvester
     8  Eigenvalues and eigenvectors   CLO 8  spectrum, eigenspaces, diagonalization
     9  Theorem lab                    CLO 1/4/5  verify a statement with a cited certificate
     0  Workbench                      evaluate matrix expressions
-    s  Sample problems                34 worked problems across all eight outcomes
+    s  Sample problems                37 worked problems across all eight outcomes
     ?  Help and keys
 ```
 
@@ -57,9 +57,55 @@ $ sylvester eigen -m "1 1; 1 0"
 ```
 
 `d < 0` is the same machinery, so `[[0, -1], [1, 0]]` reports eigenvalues of
-exactly `i` and `-i` rather than a pair of floats near zero. Only roots of
-irreducible polynomials of degree three or more fall back to numeric values, and
-those are labelled wherever they appear.
+exactly `i` and `-i` rather than a pair of floats near zero.
+
+### When there is no square root to write down
+
+Most characteristic polynomials of a 3×3 or larger matrix do not factor over the
+rationals, and their roots have no usable radical form. That does not stop the
+answer being exact. Sylvester factors the characteristic polynomial over `Q`
+(Zassenhaus: factoring modulo a prime, Hensel lifting, recombination), and each
+irreducible factor `q` of degree three or more becomes a *family* of eigenvalues:
+the roots of `q`, handled as exact algebraic numbers by computing in
+`Q(λ) = Q[λ]/(q(λ))`. Row reducing `A − λI` in that field gives one eigenvector
+whose entries are polynomials in `λ`, and because every step is an identity
+modulo `q`, it is the eigenvector for every root at once:
+
+```
+$ sylvester eigen -m "1 1 0; 1 0 1; 0 1 0"
+
+  det(λI - A) = λ^3 - λ^2 - 2λ + 1
+  factored over Q: λ^3 - λ^2 - 2λ + 1   (irreducible)
+
+  λ = each root of λ^3 - λ^2 - 2λ + 1  algebraic 1 each  geometric 1 each    all 3 real
+
+  basis vector v1 = (λ^2 - 1, λ, 1)
+  ✓ check: Av = (λ^2 + λ - 1, λ^2, λ)
+           λv = (λ^2 + λ - 1, λ^2, λ)
+    equal once λ^3 is reduced using λ^3 - λ^2 - 2λ + 1 = 0, so Av = λv for every root
+```
+
+How many roots are real is decided exactly with Sturm sequences, not by
+inspecting floating point output, and the decimal values printed beside each
+root are only there to read. Nothing in the analysis depends on them.
+
+Eigenvalues from different fields are handled the same way. The symmetric matrix
+below has eigenvalues `±4√2` and `2 ± 2√5`, so no single square root covers them.
+`AP = PD` is still verified column by column, and orthogonality between
+eigenvectors from different fields is checked exactly in the tensor ring
+`Q[x, y]/(p(x), q(y))`, where every coefficient of the inner product has to
+cancel:
+
+```
+$ sylvester eigen -m "5 1 3 -1; 1 5 -1 3; 3 -1 -3 1; -1 3 1 -3"
+
+  orthogonality between every pair of columns, checked exactly (6 checks):
+    2 by conjugate eigenvalues: the inner product is zero modulo q(x) and (q(y) - q(x))/(y - x)
+    4 by different minimal polynomials: every coefficient of the inner product in Q[x, y]/(p(x), q(y)) is zero
+```
+
+That check can fail: the test suite deliberately breaks orthogonal eigenbases
+and confirms the certificate rejects every one.
 
 ## Two ways to row reduce
 
@@ -160,7 +206,7 @@ prints this mapping with the sample problems for each.
 | 5. Vectors, inner products, projections, norms, orthogonality, independence, spanning sets, subspaces, bases, dimension, rank | `vectors`, `gram-schmidt`, `project`, `span`, `basis`, `independence` |
 | 6. Determinants to solve homogeneous and non-homogeneous systems | `solve --method cramer`, `solve --method homogeneous` |
 | 7. Rank for independence, kernel, range and nullity | `subspaces` — all four fundamental subspaces |
-| 8. Eigenvalues, eigenvectors and eigenspaces | `eigen` — characteristic polynomial, eigenspaces, diagonalization, spectral theorem |
+| 8. Eigenvalues, eigenvectors and eigenspaces | `eigen` — characteristic polynomial factored over Q, exact eigenvalues of any degree, eigenspaces, diagonalization, spectral theorem |
 
 ## Install
 
@@ -224,7 +270,7 @@ sylvester eigen    -m "5 4 2; 4 5 2; 2 2 2"
 sylvester vectors  -u "1 2 2" -v "3 0 4"
 sylvester prove    det-product "2 1; 3 4" "1 -2; 5 0"
 sylvester eval     "det(A)" -m "A=1 2; 3 4"
-sylvester samples                      # 34 worked problems
+sylvester samples                      # 37 worked problems
 sylvester outcomes                     # course outcomes and coverage
 ```
 
@@ -237,12 +283,19 @@ disables ANSI color.
 
 ```python
 from fractions import Fraction
-from sylvester import Matrix, spectrum, solve, four_subspaces, prove
+from sylvester import Matrix, Poly, factor, four_subspaces, prove, solve, spectrum
 
 A = Matrix([[1, 1], [1, 0]])
 spec = spectrum(A)
 spec.pairs[1].value           # exact (1 + sqrt 5)/2
 spec.diagonalizable           # True
+
+cubic = spectrum(Matrix([[1, 1, 0], [1, 0, 1], [0, 1, 0]])).pairs[0]
+cubic.minimal                 # x^3 - x^2 - 2x + 1, irreducible over Q
+cubic.basis                   # [(λ^2 - 1, λ, 1)] with λ an exact algebraic number
+cubic.real_count              # 3, decided by Sturm sequences
+
+factor(Poly([4, 0, 0, 0, 1])) # (1, [(x^2 - 2x + 2, 1), (x^2 + 2x + 2, 1)])
 
 solution = solve(Matrix([[1, 2, 3], [2, 4, 8]]), [Fraction(4), Fraction(10)])
 solution.kind                 # 'infinite'
@@ -260,12 +313,20 @@ prove("det-product", A, A).holds
 python -m unittest discover -s tests -t .
 ```
 
-183 tests, mostly randomized property checks: that both reduction strategies
+204 tests, mostly randomized property checks: that both reduction strategies
 reach the same RREF, that four independent determinant algorithms agree, that
 `A·adj(A) = det(A)I` and `p_A(A) = 0`, that every null space vector is
 orthogonal to every row space vector, that no proposition in the theorem lab can
 be made to fail, and that the terminal interface renders every screen without a
 line ever running past the edge.
+
+The algebraic side is tested against ground truth rather than against itself.
+Products of Eisenstein polynomials, which are provably irreducible, must factor
+back into exactly those pieces; `x^4 + 1`, which is irreducible yet splits modulo
+every prime, must survive recombination intact; every eigenvector of an
+irreducible family is evaluated at each numeric root and checked against `Av`;
+and every exact spectrum on random matrices up to 6×6 must verify, with its
+trace and determinant matching.
 
 ## License
 

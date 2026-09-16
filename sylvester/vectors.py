@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 
-from .exact import ONE, ZERO, Surd, approx, content, sqrt_exact
+from .exact import ONE, ZERO, approx, content, sqrt_exact
 from .matrix import Matrix
 
 
@@ -208,7 +209,7 @@ def gram_schmidt(vectors, clear_fractions=True):
 
 
 def _clear(v):
-    if any(isinstance(a, Surd) for a in v):
+    if any(not isinstance(a, Fraction) for a in v):
         return v
     den = 1
     for a in v:

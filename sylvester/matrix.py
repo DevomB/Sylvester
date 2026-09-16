@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from .algebraic import AlgebraicNumber
 from .exact import ONE, ZERO, Surd
+
+FIELD_TYPES = (Surd, AlgebraicNumber)
 
 
 def scalar(value):
-    return value if isinstance(value, Surd) else Fraction(value)
+    return value if isinstance(value, FIELD_TYPES) else Fraction(value)
 
 
 class Matrix:
@@ -276,7 +279,7 @@ class Matrix:
         return self.__pow__(self.nrows).is_zero()
 
     def is_rational(self):
-        return not any(isinstance(v, Surd) for v in self.entries())
+        return not any(isinstance(v, FIELD_TYPES) for v in self.entries())
 
     def with_entry(self, i, j, value):
         rows = self.to_lists()

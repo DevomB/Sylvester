@@ -7,7 +7,7 @@ from ..expr import FUNCTION_HELP, evaluate
 from ..matrix import Matrix
 from ..parse import ParseError
 from ..render import C, autodetect, dim, fmt, matrix_str, paint, set_color
-from ..samples import CLO, by_clo
+from ..samples import CLO, SAMPLES, by_clo
 from ..reduce import HUMAN, MACHINE
 from .. import vectors as V
 from . import keys as K
@@ -131,7 +131,7 @@ class HomeScreen(Screenlet):
             ("8", "Eigenvalues and eigenvectors", "CLO 8  spectrum, eigenspaces, diagonalization"),
             ("9", "Theorem lab", "CLO 1/4/5  verify a statement with a cited certificate"),
             ("0", "Workbench", "evaluate matrix expressions"),
-            ("s", "Sample problems", "34 worked problems across all eight outcomes"),
+            ("s", "Sample problems", "%d worked problems across all eight outcomes" % len(SAMPLES)),
             ("?", "Help and keys", ""),
         ])
 
@@ -888,11 +888,11 @@ class StoreResultScreen(Screenlet):
 
 class SampleScreen(Screenlet):
     title = "sample problems"
-    subtitle = "34 worked problems covering all eight course outcomes"
     footer = "enter load   esc back"
 
     def __init__(self, app):
         super().__init__(app)
+        self.subtitle = "%d worked problems covering all eight course outcomes" % len(SAMPLES)
         items = []
         self.lookup = []
         for clo in sorted(CLO):
@@ -1045,11 +1045,12 @@ def help_text():
     out.append("")
     out.append(paint("  EXACTNESS", C.BOLD))
     out.extend(wrap_lines(
-        "Every number is an exact rational, or an exact element of a quadratic field "
-        "when an eigenvalue needs one. 1/3 stays 1/3. An eigenvalue of (1 + sqrt 5)/2 "
-        "stays that, and its eigenvector is computed in the same field. Only roots of "
-        "irreducible polynomials of degree three or more fall back to numeric values, "
-        "and those are labelled where they appear.", 66, "    "))
+        "Every number is exact. 1/3 stays 1/3. An eigenvalue of (1 + sqrt 5)/2 stays "
+        "that, and its eigenvector is computed in the same field. When the characteristic "
+        "polynomial has an irreducible factor of degree three or more, its roots are "
+        "handled as exact algebraic numbers in Q[L]/(q(L)): one eigenvector, written as "
+        "polynomials in L, serves every root at once, and Sturm sequences decide exactly "
+        "how many roots are real. Decimals appear only as a reading aid.", 66, "    "))
     return "\n".join(out)
 
 

@@ -180,13 +180,23 @@ class ReportTest(unittest.TestCase):
 
     def test_eigen_report_covers_the_interesting_cases(self):
         for matrix, expected in [
-            (Matrix([[1, 1], [0, 1]]), "not diagonalizable"),
-            (Matrix([[2, 1], [1, 2]]), "diagonalizable"),
-            (Matrix([[1, 1], [1, 0]]), "sqrt5"),
-            (Matrix([[0, -1], [1, 0]]), "i"),
+            (Matrix([[1, 1], [0, 1]]), ["not diagonalizable"]),
+            (Matrix([[2, 1], [1, 2]]), ["diagonalizable", "Spectral theorem"]),
+            (Matrix([[1, 1], [1, 0]]), ["sqrt5", "Spectral theorem"]),
+            (Matrix([[0, -1], [1, 0]]), ["i", "over the complex numbers"]),
+            (Matrix([[1, 1, 0], [1, 0, 1], [0, 1, 0]]),
+             ["each root of L^3 - L^2 - 2L + 1", "(irreducible)", "(L^2 - 1, L, 1)", "all 3 real",
+              "Sturm", "conjugate eigenvalues"]),
+            (Matrix([[0, 0, 2], [1, 0, 0], [0, 1, 0]]),
+             ["1 real, 2 complex", "(L^2, L, 1)", "over the complex numbers", "w1(L1)"]),
+            (Matrix([[5, 1, 3, -1], [1, 5, -1, 3], [3, -1, -3, 1], [-1, 3, 1, -3]]),
+             ["4sqrt2", "2 + 2sqrt5", "different minimal polynomials", "AP = PD"]),
         ]:
-            text = ANSI.sub("", report.eigen_report(matrix))
-            self.assertIn(expected, text)
+            text = ANSI.sub("", report.eigen_report(matrix, show_steps=True))
+            for fragment in expected:
+                self.assertIn(fragment, text, (matrix.to_lists(), fragment))
+            for fallback in ("known numerically", "reported numerically", "not comparable", "degree above 2"):
+                self.assertNotIn(fallback, text)
 
     def test_parametric_entry_and_vector_form(self):
         from sylvester.solve import solve

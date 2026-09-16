@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sylvester"
-version = "1.0.0"
+version = "1.1.0"
 description = "An exact linear algebra workbench for the terminal"
 readme = "README.md"
 requires-python = ">=3.9"

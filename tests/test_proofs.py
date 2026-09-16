@@ -112,6 +112,19 @@ class PropositionTest(unittest.TestCase):
         certificate = proof.check("linear-independence", independent)
         self.assertIn("pivot", certificate.conclusion)
 
+    def test_eigen_propositions_hold_for_families_and_mixed_fields(self):
+        cases = [
+            Matrix([[1, 1, 0], [1, 0, 1], [0, 1, 0]]),
+            Matrix([[0, 0, 2], [1, 0, 0], [0, 1, 0]]),
+            Matrix([[5, 1, 3, -1], [1, 5, -1, 3], [3, -1, -3, 1], [-1, 3, 1, -3]]),
+            Matrix([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 0, 3], [0, 0, 3, 1]]),
+        ]
+        for a in cases:
+            for key in ("eigen-definition", "eigen-trace-det", "distinct-eigenvalues-independent",
+                        "symmetric-real-eigenvalues", "cayley-hamilton"):
+                certificate = proof.check(key, a)
+                self.assertIs(certificate.holds, True, (key, a.to_lists(), certificate.conclusion))
+
     def test_cauchy_schwarz_equality_is_detected(self):
         u = (Fraction(1), Fraction(2))
         certificate = proof.check("cauchy-schwarz", u, (Fraction(2), Fraction(4)))
@@ -169,6 +182,15 @@ class SampleTest(unittest.TestCase):
         self.assertFalse(spectrum(registers("eigen-complex")["A"]).real_only)
         self.assertTrue(registers("eigen-symmetric")["A"].is_symmetric())
         self.assertEqual(determinant(registers("cramer-blocked")["A"]), 0)
+        cubic = spectrum(registers("eigen-cubic")["A"])
+        self.assertTrue(cubic.symbolic and cubic.real_only and cubic.verify())
+        cube_root = spectrum(registers("eigen-cube-root")["A"])
+        self.assertTrue(cube_root.symbolic and not cube_root.real_only and cube_root.verify())
+        from sylvester.eigen import orthogonally_diagonalize
+
+        two_fields = orthogonally_diagonalize(registers("eigen-two-fields")["A"])
+        self.assertTrue(two_fields.ok)
+        self.assertEqual({p.value.d for p in two_fields.spectrum.pairs}, {2, 5})
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import os
 import sys
 from fractions import Fraction
 
+from .algebraic import AlgebraicNumber
 from .exact import Surd
 
 _ASCII = False
@@ -145,6 +146,8 @@ def _int_term(m, rad):
 def fmt(value):
     if isinstance(value, Surd):
         return _fmt_surd(value)
+    if isinstance(value, AlgebraicNumber):
+        return _fmt_algebraic(value)
     if isinstance(value, complex):
         if abs(value.imag) < 1e-12:
             return "%.6g" % value.real
@@ -174,6 +177,45 @@ def _fmt_surd(value):
     if a == 0:
         return ("-" + tail) if b < 0 else tail
     return "%s %s %s" % (fmt(a), "-" if b < 0 else "+", tail)
+
+
+def symbol(name):
+    if name == "lambda":
+        return glyph("λ", "L")
+    return glyph("α", "a")
+
+
+def _fmt_algebraic(value):
+    name = symbol(value.field.symbol)
+    terms = []
+    for i in range(len(value.c) - 1, -1, -1):
+        a = value.c[i]
+        if not a:
+            continue
+        mag = abs(a)
+        if i == 0:
+            body = fmt(mag)
+        else:
+            power = name if i == 1 else "%s^%d" % (name, i)
+            if mag == 1:
+                body = power
+            elif mag.denominator == 1:
+                body = "%d%s" % (mag.numerator, power)
+            else:
+                body = "(%s)%s" % (fmt(mag), power)
+        if terms:
+            terms.append((" - " if a < 0 else " + ") + body)
+        else:
+            terms.append(("-" if a < 0 else "") + body)
+    return "".join(terms)
+
+
+def sqrt_text(value):
+    if isinstance(value, Fraction) or isinstance(value, int):
+        from .exact import sqrt_exact
+
+        return fmt(sqrt_exact(value))
+    return "%s(%s)" % (glyph("√", "sqrt"), fmt(value))
 
 
 def fmt_coeff(value):

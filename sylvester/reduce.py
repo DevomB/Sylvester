@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from math import gcd
 
-from .exact import ONE, ZERO, Surd, content, weight
+from .exact import ONE, ZERO, Surd, content, denominators, weight
 from .matrix import Matrix
 from .render import arrow, fmt, fmt_coeff, leftrightarrow
 
@@ -22,12 +22,7 @@ class Step:
 
     @property
     def has_fraction(self):
-        return any(
-            (v.a.denominator != 1 or v.b.denominator != 1)
-            if isinstance(v, Surd)
-            else v.denominator != 1
-            for v in self.matrix.entries()
-        )
+        return any(d != 1 for v in self.matrix.entries() for d in denominators(v))
 
 
 @dataclass
@@ -70,14 +65,7 @@ class Reduction:
 
     @property
     def worst_denominator(self):
-        worst = 1
-        for s in self.steps:
-            for v in s.matrix.entries():
-                if isinstance(v, Surd):
-                    worst = max(worst, v.a.denominator, v.b.denominator)
-                else:
-                    worst = max(worst, v.denominator)
-        return worst
+        return max((d for s in self.steps for v in s.matrix.entries() for d in denominators(v)), default=1)
 
     @property
     def largest_entry(self):
@@ -140,32 +128,26 @@ def describe_combination(target, source, t_mult, s_mult):
 def _negative(value):
     if isinstance(value, Surd):
         return value.is_real and value.sign() < 0
-    return value < 0
+    return isinstance(value, Fraction) and value < 0
 
 
 def _is_rat(value):
-    return not isinstance(value, Surd)
+    return isinstance(value, (int, Fraction))
 
 
-def _norm2(value):
-    return value.field_norm() if isinstance(value, Surd) else value * value
-
-
-def _column_is_real(m, r0, col):
-    return all(not isinstance(m[r][col], Surd) or m[r][col].is_real for r in range(r0, len(m)))
+def _orderable(value):
+    return _is_rat(value) or (isinstance(value, Surd) and value.is_real)
 
 
 def machine_pivot(m, r0, col):
-    use_abs = _column_is_real(m, r0, col)
-    best, best_key = None, None
-    for r in range(r0, len(m)):
-        v = m[r][col]
-        if not v:
-            continue
-        key = abs(v) if use_abs else _norm2(v)
-        if best is None or key > best_key:
-            best, best_key = r, key
-    return best
+    rows = [r for r in range(r0, len(m)) if m[r][col]]
+    if not rows:
+        return None
+    if all(_orderable(m[r][col]) for r in rows):
+        return max(rows, key=lambda r: abs(m[r][col]))
+    if all(_is_rat(m[r][col]) or isinstance(m[r][col], Surd) for r in rows):
+        return max(rows, key=lambda r: m[r][col].field_norm() if isinstance(m[r][col], Surd) else m[r][col] ** 2)
+    return min(rows, key=lambda r: weight(m[r][col]))
 
 
 def human_pivot(m, r0, col):
@@ -371,14 +353,17 @@ def rank(matrix):
 
 
 def nullspace_basis(matrix):
-    red = row_reduce(matrix)
-    pivot_of = {c: r for r, c in red.pivots}
+    return nullspace_from(row_reduce(matrix))
+
+
+def nullspace_from(reduction):
+    width = reduction.original.ncols
     basis = []
-    for free in red.free_columns:
-        vec = [ZERO] * matrix.ncols
+    for free in reduction.free_columns:
+        vec = [ZERO] * width
         vec[free] = ONE
-        for c, r in pivot_of.items():
-            vec[c] = -red.rref[r][free]
+        for r, c in reduction.pivots:
+            vec[c] = -reduction.rref[r][free]
         basis.append(tuple(vec))
     return basis
 

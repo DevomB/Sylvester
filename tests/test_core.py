@@ -2,9 +2,9 @@ import math
 import unittest
 from fractions import Fraction
 
-from sylvester.exact import Surd, content, common_denominator, sqrt_exact, squarefree, surd, weight
+from sylvester.exact import Surd, content, sqrt_exact, squarefree, surd, weight
 from sylvester.matrix import Matrix, elementary_add, elementary_scale, elementary_swap
-from sylvester.polynomial import Poly, from_roots, rational_roots, roots_of
+from sylvester.polynomial import Poly, from_roots, quadratic_roots, rational_roots
 from sylvester.render import fmt
 
 from .support import naive_determinant, random_matrix, random_square, seeded
@@ -90,7 +90,6 @@ class SurdTest(unittest.TestCase):
     def test_helpers(self):
         self.assertEqual(content([Fraction(4), Fraction(6), Fraction(-8)]), 2)
         self.assertEqual(content([Fraction(1, 2), Fraction(3)]), 1)
-        self.assertEqual(common_denominator([Fraction(1, 2), Fraction(1, 3)]), 6)
         self.assertGreater(weight(Fraction(7, 3)), weight(Fraction(1)))
 
 
@@ -136,54 +135,21 @@ class PolynomialTest(unittest.TestCase):
         self.assertEqual(found[Fraction(2)], 2)
         self.assertEqual(found[Fraction(-1, 3)], 1)
 
-    def test_roots_are_exact_where_possible(self):
-        cases = {
-            (-6, 11, -6, 1): [1, 2, 3],
-            (-1, 0, 1): [-1, 1],
-            (6, -5, 1): [2, 3],
-            (1, -2, 1): [1],
-        }
-        for coeffs, expected in cases.items():
-            roots, exact = roots_of(Poly(coeffs))
-            self.assertTrue(exact)
-            self.assertEqual(sorted(float(r.value) for r in roots), sorted(float(x) for x in expected))
-
-    def test_quadratic_surd_roots(self):
-        roots, exact = roots_of(Poly([-1, -1, 1]))
-        self.assertTrue(exact)
-        self.assertEqual(len(roots), 2)
-        self.assertAlmostEqual(max(r.approx() for r in roots), (1 + 5 ** 0.5) / 2)
-
-    def test_complex_roots(self):
-        roots, exact = roots_of(Poly([1, 0, 1]))
-        self.assertTrue(exact)
-        self.assertTrue(all(not r.is_real for r in roots))
-
-    def test_biquadratic(self):
-        roots, exact = roots_of(Poly([-6, 0, 5, 0, -1]))
-        self.assertTrue(exact)
-        self.assertEqual(len(roots), 4)
-
-    def test_numeric_fallback_still_totals_degree(self):
-        p = Poly([1, 1, 1, 1, 1])
-        roots, exact = roots_of(p)
-        self.assertFalse(exact)
-        self.assertEqual(sum(r.multiplicity for r in roots), p.degree)
-
-    def test_multiplicities_total_degree(self):
-        rng = seeded(3)
-        for _ in range(200):
-            p = Poly([rng.randint(-6, 6) for _ in range(rng.randint(2, 5))] + [rng.randint(1, 4)])
-            roots, _ = roots_of(p)
-            self.assertEqual(sum(r.multiplicity for r in roots), p.degree)
-            for r in roots:
-                if r.exact:
-                    self.assertEqual(p.eval(r.value), 0)
+    def test_quadratic_roots_are_exact(self):
+        low, high = sorted(quadratic_roots(Fraction(1), Fraction(-1), Fraction(-1)), key=float)
+        self.assertIsInstance(high, Surd)
+        self.assertAlmostEqual(float(high), (1 + 5 ** 0.5) / 2)
+        self.assertEqual(high * high - high - 1, 0)
+        i, minus_i = quadratic_roots(Fraction(1), Fraction(0), Fraction(1))
+        self.assertFalse(i.is_real)
+        self.assertEqual(i * i, -1)
+        self.assertEqual(quadratic_roots(Fraction(1), Fraction(-5), Fraction(6)), [3, 2])
 
     def test_formatting(self):
         self.assertEqual(str(Poly([-6, 11, -6, 1])), "x^3 - 6x^2 + 11x - 6")
         self.assertEqual(str(Poly([])), "0")
         self.assertEqual(Poly([0, 0, 1]).shift_variable("L"), "L^2")
+        self.assertEqual(Poly([Fraction(1, 2), Fraction(-3, 2), 1]).shift_variable("L"), "L^2 - (3/2)L + 1/2")
 
 
 class MatrixTest(unittest.TestCase):

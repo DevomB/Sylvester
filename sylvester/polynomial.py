@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import cmath
 import math
 from fractions import Fraction
 
-from .exact import ONE, ZERO, Surd, sqrt_exact
+from .exact import ONE, ZERO, sqrt_exact
 
 
 class Poly:
@@ -175,7 +176,12 @@ def format_poly(coeffs, name="x"):
             body = _num(mag)
         else:
             power = name if i == 1 else "%s^%d" % (name, i)
-            body = power if mag == 1 else "%s%s" % (_num(mag), power)
+            if mag == 1:
+                body = power
+            elif mag.denominator == 1:
+                body = "%s%s" % (_num(mag), power)
+            else:
+                body = "(%s)%s" % (_num(mag), power)
         if not terms:
             terms.append(("-" if a < 0 else "") + body)
         else:
@@ -247,13 +253,6 @@ def _synthetic(coeffs, root):
     return out, carry
 
 
-def deflate(poly, root, times=1):
-    coeffs = list(poly.c)
-    for _ in range(times):
-        coeffs, _ = _synthetic(coeffs, root)
-    return Poly(coeffs)
-
-
 def discriminant(a, b, c):
     return b * b - 4 * a * c
 
@@ -263,42 +262,35 @@ def quadratic_roots(a, b, c):
     return [(-b + r) / (2 * a), (-b - r) / (2 * a)]
 
 
-def _biquadratic_roots(poly):
-    if poly.degree != 4 or poly[1] != 0 or poly[3] != 0:
-        return None
-    out = []
-    for value in quadratic_roots(poly[4], poly[2], poly[0]):
-        if isinstance(value, Surd):
-            return None
-        r = sqrt_exact(value)
-        out.extend([r, -r] if r != 0 else [r, r])
-    return out
+def root_bound(poly):
+    lead = abs(poly.lead)
+    return 1 + max((abs(c) / lead for c in poly.c[:-1]), default=ZERO)
 
 
-def numeric_roots(poly, iterations=500, tol=1e-14):
+def numeric_roots(poly, iterations=800, tol=1e-15):
     coeffs = [complex(x) for x in poly.c]
     n = len(coeffs) - 1
     if n < 1:
         return []
     lead = coeffs[-1]
     monic = [c / lead for c in coeffs]
-    guesses = [(0.4 + 0.9j) ** k for k in range(n)]
+    radius = float(root_bound(poly))
+    guesses = [radius * cmath.exp(1j * (2 * cmath.pi * k / n + 0.4)) for k in range(n)]
     for _ in range(iterations):
         delta = 0.0
         for i in range(n):
-            num = _horner(monic, guesses[i])
             den = 1 + 0j
             for j in range(n):
                 if i != j:
                     den *= guesses[i] - guesses[j]
             if den == 0:
                 continue
-            step = num / den
+            step = _horner(monic, guesses[i]) / den
             guesses[i] -= step
             delta = max(delta, abs(step))
         if delta < tol:
             break
-    return guesses
+    return [_polish(poly, z) for z in guesses]
 
 
 def _horner(coeffs, z):
@@ -308,81 +300,104 @@ def _horner(coeffs, z):
     return total
 
 
-class Root:
-    __slots__ = ("value", "multiplicity", "exact")
-
-    def __init__(self, value, multiplicity, exact=True):
-        self.value = value
-        self.multiplicity = multiplicity
-        self.exact = exact
-
-    @property
-    def is_real(self):
-        if self.exact:
-            return not isinstance(self.value, Surd) or self.value.is_real
-        return abs(self.value.imag) < 1e-9
-
-    def approx(self):
-        if not self.exact:
-            return self.value
-        if isinstance(self.value, Surd):
-            return self.value.approx()
-        return float(self.value)
-
-    def __repr__(self):
-        return "Root(%r, x%d, exact=%s)" % (self.value, self.multiplicity, self.exact)
+def _polish(poly, z, steps=40):
+    coeffs = [complex(c) for c in poly.c]
+    slope = [complex(c * i) for i, c in enumerate(poly.c)][1:]
+    for _ in range(steps):
+        d = _horner(slope, z)
+        if not d:
+            break
+        step = _horner(coeffs, z) / d
+        z -= step
+        if abs(step) <= 1e-17 * max(1.0, abs(z)):
+            break
+    return z
 
 
-def roots_of(poly):
-    if poly.degree < 1:
-        return [], True
-    found = []
-    remaining = poly
-    for value, mult in rational_roots(poly):
-        found.append(Root(value, mult))
-        remaining = deflate(remaining, value, mult)
-    exact = True
-    if remaining.degree == 1:
-        found.append(Root(-remaining[0] / remaining[1], 1))
-    elif remaining.degree == 2:
-        for r in quadratic_roots(remaining[2], remaining[1], remaining[0]):
-            _merge(found, r)
-    elif remaining.degree > 2:
-        bi = _biquadratic_roots(remaining)
-        if bi is not None:
-            for r in bi:
-                _merge(found, r)
+def sturm_chain(poly):
+    chain = [poly, poly.derivative()]
+    while chain[-1].degree > 0:
+        remainder = chain[-2] % chain[-1]
+        if not remainder:
+            break
+        chain.append(-remainder)
+    return chain
+
+
+def _variations(values):
+    count = 0
+    previous = 0
+    for v in values:
+        if v:
+            sign = 1 if v > 0 else -1
+            if previous and sign != previous:
+                count += 1
+            previous = sign
+    return count
+
+
+def _variations_at(chain, x):
+    return _variations([q.eval(x) for q in chain])
+
+
+def _variations_at_infinity(chain, sign):
+    return _variations([q.lead if sign > 0 or q.degree % 2 == 0 else -q.lead for q in chain])
+
+
+def count_real_roots(poly):
+    chain = sturm_chain(poly)
+    return _variations_at_infinity(chain, -1) - _variations_at_infinity(chain, 1)
+
+
+def isolate_real_roots(poly):
+    chain = sturm_chain(poly)
+    bound = root_bound(poly) + 1
+    pending = [(-bound, bound, _variations_at(chain, -bound), _variations_at(chain, bound))]
+    out = []
+    while pending:
+        a, b, va, vb = pending.pop()
+        count = va - vb
+        if count == 1:
+            out.append((a, b))
+        elif count > 1:
+            mid = (a + b) / 2
+            while not poly.eval(mid):
+                mid = (mid + b) / 2
+            vm = _variations_at(chain, mid)
+            pending.append((a, mid, va, vm))
+            pending.append((mid, b, vm, vb))
+    out.sort()
+    return out
+
+
+def refine_real_root(poly, a, b, bits=64):
+    if not poly.eval(b):
+        return float(b)
+    rising = poly.eval(a) < 0
+    width = Fraction(1, 1 << bits)
+    while b - a > width:
+        mid = (a + b) / 2
+        value = poly.eval(mid)
+        if not value:
+            return float(mid)
+        if (value < 0) == rising:
+            a = mid
         else:
-            exact = False
-            for z in numeric_roots(remaining):
-                _merge_numeric(found, z)
-    found.sort(key=_root_order)
-    return found, exact
+            b = mid
+    return float((a + b) / 2)
 
 
-def _merge(found, value):
-    for r in found:
-        if r.exact and r.value == value:
-            r.multiplicity += 1
-            return
-    found.append(Root(value, 1))
-
-
-def _merge_numeric(found, z, tol=1e-7):
-    if abs(z.imag) < tol:
-        z = complex(z.real, 0.0)
-    for r in found:
-        if not r.exact and abs(r.value - z) < tol:
-            r.multiplicity += 1
-            return
-    found.append(Root(z, 1, exact=False))
-
-
-def _root_order(root):
-    value = root.approx()
-    if isinstance(value, complex):
-        return (1, value.real, value.imag)
-    return (0, value, 0.0)
+def approximate_roots(poly):
+    real = [refine_real_root(poly, a, b) for a, b in isolate_real_roots(poly)]
+    missing = poly.degree - len(real)
+    if not missing:
+        return real, []
+    candidates = sorted(numeric_roots(poly), key=lambda z: -abs(z.imag))[:missing]
+    upper = sorted((z for z in candidates if z.imag > 0), key=lambda z: (z.real, z.imag))
+    paired = [w for z in upper for w in (z, z.conjugate())]
+    if len(paired) != missing:
+        paired = sorted(candidates, key=lambda z: (z.real, -z.imag))
+    return real, paired
 
 
 def from_roots(roots):
